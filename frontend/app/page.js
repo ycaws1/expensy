@@ -13,13 +13,19 @@ function App() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [timeFilter, setTimeFilter] = useState('month');
   
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    price: '',
-    category: '',
-    paymentMethod: '',
-    description: ''
-  });
+  const getLocalDate = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const [date, setDate] = useState(getLocalDate());
+  const [price, setPrice] = useState('');
+  const [category, setCategory] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
     const stored = localStorage.getItem('expenses');
@@ -34,25 +40,26 @@ function App() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.price || !formData.category || !formData.paymentMethod) {
+    if (!price || !category || !paymentMethod) {
       alert('Please fill in all required fields');
       return;
     }
 
     const newExpense = {
       id: Date.now(),
-      ...formData,
-      price: parseFloat(formData.price)
+      date,
+      price: parseFloat(price),
+      category,
+      paymentMethod,
+      description
     };
 
     setExpenses([newExpense, ...expenses]);
-    setFormData({
-      date: new Date().toISOString().split('T')[0],
-      price: '',
-      category: '',
-      paymentMethod: '',
-      description: ''
-    });
+    setDate(getLocalDate());
+    setPrice('');
+    setCategory('');
+    setPaymentMethod('');
+    setDescription('');
     setShowAddForm(false);
   };
 
@@ -173,6 +180,34 @@ function App() {
   const HistoryScreen = () => (
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-4 text-gray-800">Transaction History</h2>
+      
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setTimeFilter('week')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+            timeFilter === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          This Week
+        </button>
+        <button
+          onClick={() => setTimeFilter('month')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+            timeFilter === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          This Month
+        </button>
+        <button
+          onClick={() => setTimeFilter('all')}
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+            timeFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          All Time
+        </button>
+      </div>
+      
       <div className="space-y-3">
         {getFilteredExpenses().map(expense => (
           <div key={expense.id} className="bg-white rounded-xl p-4 shadow flex justify-between items-start">
@@ -293,87 +328,6 @@ function App() {
     );
   };
 
-  const AddExpenseForm = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
-      <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 space-y-4 animate-slide-up">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Add Expense</h2>
-          <button onClick={() => setShowAddForm(false)} className="text-gray-500 text-2xl">&times;</button>
-        </div>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
-            <input
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Price *</label>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select category</option>
-              {CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method *</label>
-            <select
-              value={formData.paymentMethod}
-              onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select payment method</option>
-              {PAYMENT_METHODS.map(method => (
-                <option key={method} value={method}>{method}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input
-              type="text"
-              placeholder="Optional"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <button
-            onClick={handleSubmit}
-            className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition shadow-lg"
-          >
-            Save Expense
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="bg-white shadow-sm px-6 py-4">
@@ -383,8 +337,82 @@ function App() {
       {activeTab === 'home' && <HomeScreen />}
       {activeTab === 'history' && <HistoryScreen />}
       {activeTab === 'analytics' && <AnalyticsScreen />}
-
-      {showAddForm && <AddExpenseForm />}
+      
+      {showAddForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
+          <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 space-y-4 animate-slide-up">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Add Expense</h2>
+              <button onClick={() => setShowAddForm(false)} className="text-gray-500 text-2xl">&times;</button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Date *</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Price *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Category *</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="">Select category</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Payment Method *</label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="">Select payment method</option>
+                  {PAYMENT_METHODS.map(method => (
+                    <option key={method} value={method}>{method}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Description</label>
+                <input
+                  type="text"
+                  placeholder="Optional"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                />
+              </div>
+              <button
+                onClick={handleSubmit}
+                className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition shadow-lg"
+              >
+                Save Expense
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-3">
         <button
