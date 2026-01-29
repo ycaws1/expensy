@@ -1,70 +1,134 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, TrendingUp, List, Trash2, PieChart } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart as RePieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import BottomNav from './components/BottomNav';
+import SummaryCard from './components/SummaryCard';
+import ExpenseList from './components/ExpenseList';
+import AddExpenseModal from './components/AddExpenseModal';
+import Analytics from './components/Analytics';
+import { cn } from './lib/utils'; // Keep this for utility usage if needed in page.js 
 
-const CATEGORIES = ['Food', 'Transport', 'Rent', 'Entertainment', 'Shopping', 'Utilities', 'Healthcare', 'Other'];
-const PAYMENT_METHODS = ['Cash', 'Credit Card', 'Debit Card', 'Bank Transfer', 'Digital Wallet'];
-const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1'];
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 
-function App() {
+const INITIAL_DATA = [
+  { id: 1, category: 'Food', price: 12.50, date: '2025-01-20', paymentMethod: 'Card', description: 'Lunch' },
+  { id: 2, category: 'Transport', price: 35.00, date: '2025-01-19', paymentMethod: 'Digital Wallet', description: 'Uber' },
+];
+
+export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [expenses, setExpenses] = useState([]);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [timeFilter, setTimeFilter] = useState('month');
-  
-  const getLocalDate = () => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+  const [editingExpense, setEditingExpense] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchExpenses = async () => {
+    setLoading(true);
+    let success = false;
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('expenses')
+          .select('*')
+          .order('date', { ascending: false });
+
+        if (error) throw error;
+
+        if (data) {
+          const formattedData = data.map(item => ({
+            ...item,
+            paymentMethod: item.payment_method
+          }));
+          setExpenses(formattedData);
+          success = true;
+        }
+      } catch (error) {
+        // console.warn('Supabase fetch failed, falling back to local storage:', error.message);
+      }
+    }
+
+    if (!success) {
+      // Fallback to local data if DB connection fails/not set up
+      const stored = localStorage.getItem('expenses');
+      if (stored) {
+        setExpenses(JSON.parse(stored));
+      } else {
+        setExpenses(INITIAL_DATA);
+      }
+    }
+    setLoading(false);
   };
-  
-  const [date, setDate] = useState(getLocalDate());
-  const [price, setPrice] = useState('');
-  const [category, setCategory] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [description, setDescription] = useState('');
 
   useEffect(() => {
-    const stored = localStorage.getItem('expenses');
-    if (stored) {
-      setExpenses(JSON.parse(stored));
-    }
+    fetchExpenses();
   }, []);
 
   useEffect(() => {
     localStorage.setItem('expenses', JSON.stringify(expenses));
   }, [expenses]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!price || !category || !paymentMethod) {
-      alert('Please fill in all required fields');
-      return;
+  const handleSaveExpense = async (savedExpense) => {
+    // 1. Optimistic / Fallback Local Update
+    const updatedExpenses = savedExpense.id
+      ? expenses.map(e => e.id === savedExpense.id ? savedExpense : e)
+      : [{ ...savedExpense, id: savedExpense.id || Date.now() }, ...expenses];
+
+    setExpenses(updatedExpenses);
+    setEditingExpense(null);
+
+    // 2. Try Sync to Supabase
+    if (isSupabaseConfigured) {
+      try {
+        const payload = {
+          date: savedExpense.date,
+          price: savedExpense.price,
+          category: savedExpense.category,
+          payment_method: savedExpense.paymentMethod,
+          description: savedExpense.description
+        };
+
+        if (savedExpense.id) {
+          // Update existing
+          const { error } = await supabase
+            .from('expenses')
+            .update(payload)
+            .eq('id', savedExpense.id);
+          if (error) throw error;
+        } else {
+          // Add new
+          const { error } = await supabase
+            .from('expenses')
+            .insert([payload]);
+          if (error) throw error;
+        }
+      } catch (error) {
+        console.warn('Sync to Supabase failed (using local data):', error.message);
+      }
     }
-
-    const newExpense = {
-      id: Date.now(),
-      date,
-      price: parseFloat(price),
-      category,
-      paymentMethod,
-      description
-    };
-
-    setExpenses([newExpense, ...expenses]);
-    setDate(getLocalDate());
-    setPrice('');
-    setCategory('');
-    setPaymentMethod('');
-    setDescription('');
-    setShowAddForm(false);
   };
 
-  const deleteExpense = (id) => {
+  const handleEditClick = (expense) => {
+    setEditingExpense(expense);
+    setShowAddModal(true);
+  };
+
+  const handleDeleteExpense = async (id) => {
+    // 1. Optimistic / Fallback Local Update
     setExpenses(expenses.filter(e => e.id !== id));
+
+    // 2. Try Sync to Supabase
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('expenses')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+      } catch (error) {
+        console.warn('Sync to Supabase failed (using local data):', error.message);
+      }
+    }
   };
 
   const getFilteredExpenses = () => {
@@ -75,11 +139,11 @@ function App() {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         return expenseDate >= weekAgo;
       } else if (timeFilter === 'month') {
-        return expenseDate.getMonth() === now.getMonth() && 
-               expenseDate.getFullYear() === now.getFullYear();
+        return expenseDate.getMonth() === now.getMonth() &&
+          expenseDate.getFullYear() === now.getFullYear();
       }
       return true;
-    });
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
   };
 
   const getTotalSpent = () => {
@@ -89,15 +153,14 @@ function App() {
   const getCategoryData = () => {
     const filtered = getFilteredExpenses();
     const categoryTotals = {};
-    
+
     filtered.forEach(expense => {
       categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.price;
     });
 
-    return Object.entries(categoryTotals).map(([name, value]) => ({
-      name,
-      value: parseFloat(value.toFixed(2))
-    }));
+    return Object.entries(categoryTotals)
+      .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }))
+      .sort((a, b) => b.value - a.value);
   };
 
   const getTrendData = () => {
@@ -117,334 +180,127 @@ function App() {
       .sort((a, b) => new Date(a.date) - new Date(b.date));
   };
 
-  const HomeScreen = () => (
-    <div className="p-6 space-y-6">
-      <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
-        <p className="text-sm opacity-90 mb-1">Total Spent This {timeFilter === 'week' ? 'Week' : timeFilter === 'month' ? 'Month' : 'Period'}</p>
-        <h1 className="text-4xl font-bold">${getTotalSpent().toFixed(2)}</h1>
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={() => setTimeFilter('week')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-            timeFilter === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          This Week
-        </button>
-        <button
-          onClick={() => setTimeFilter('month')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-            timeFilter === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          This Month
-        </button>
-        <button
-          onClick={() => setTimeFilter('all')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-            timeFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          All Time
-        </button>
-      </div>
-
-      <div className="bg-white rounded-xl p-4 shadow">
-        <h3 className="font-semibold mb-3 text-gray-800">Recent Expenses</h3>
-        {getFilteredExpenses().slice(0, 5).map(expense => (
-          <div key={expense.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
-            <div>
-              <p className="font-medium text-gray-800">{expense.category}</p>
-              <p className="text-xs text-gray-500">{expense.date}</p>
-            </div>
-            <p className="font-semibold text-gray-900">${expense.price.toFixed(2)}</p>
-          </div>
-        ))}
-        {getFilteredExpenses().length === 0 && (
-          <p className="text-gray-400 text-center py-8">No expenses yet</p>
-        )}
-      </div>
-
-      <button
-        onClick={() => setShowAddForm(true)}
-        className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg hover:bg-blue-600 transition"
-      >
-        <PlusCircle size={24} />
-        Add Expense
-      </button>
-    </div>
-  );
-
-  const HistoryScreen = () => (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">Transaction History</h2>
-      
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setTimeFilter('week')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-            timeFilter === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          This Week
-        </button>
-        <button
-          onClick={() => setTimeFilter('month')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-            timeFilter === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          This Month
-        </button>
-        <button
-          onClick={() => setTimeFilter('all')}
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-            timeFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          All Time
-        </button>
-      </div>
-      
-      <div className="space-y-3">
-        {getFilteredExpenses().map(expense => (
-          <div key={expense.id} className="bg-white rounded-xl p-4 shadow flex justify-between items-start">
-            <div className="flex-1">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-gray-800">{expense.category}</h3>
-                <button
-                  onClick={() => deleteExpense(expense.id)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-              <p className="text-sm text-gray-600">{expense.description || 'No description'}</p>
-              <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                <span>{expense.date}</span>
-                <span>{expense.paymentMethod}</span>
-              </div>
-            </div>
-            <p className="font-bold text-lg text-gray-900 ml-4">${expense.price.toFixed(2)}</p>
-          </div>
-        ))}
-        {getFilteredExpenses().length === 0 && (
-          <p className="text-gray-400 text-center py-12">No transactions to display</p>
-        )}
-      </div>
-    </div>
-  );
-
-  const AnalyticsScreen = () => {
-    const categoryData = getCategoryData();
-    const trendData = getTrendData();
-
+  if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <h2 className="text-2xl font-bold text-gray-800">Analytics</h2>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
-        <div className="flex gap-2">
-          <button
-            onClick={() => setTimeFilter('week')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-              timeFilter === 'week' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            This Week
-          </button>
-          <button
-            onClick={() => setTimeFilter('month')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-              timeFilter === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            This Month
-          </button>
-          <button
-            onClick={() => setTimeFilter('all')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
-              timeFilter === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-            }`}
-          >
-            All Time
-          </button>
+  return (
+    <div className="min-h-screen bg-background text-foreground font-sans relative">
+      {/* Dynamic Background Blob */}
+      <div className="fixed top-0 left-0 w-full h-96 bg-primary/10 rounded-b-[50%] blur-3xl -z-10 animate-pulse-glow" />
+
+      <div className="max-w-md mx-auto min-h-screen flex flex-col relative pb-24">
+        {/* Header */}
+        <div className="px-6 pt-8 pb-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Expensy</h1>
+            <p className="text-sm text-muted-foreground">Track your wealth</p>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-500 shadow-lg border-2 border-white" />
         </div>
 
-        <div className="bg-white rounded-xl p-4 shadow">
-          <h3 className="font-semibold mb-4 text-gray-800">Spending Trend</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={trendData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Line type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <div className="px-6 flex-1 space-y-6">
+          {activeTab === 'home' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <SummaryCard
+                totalSpent={getTotalSpent()}
+                timeFilter={timeFilter}
+                setTimeFilter={setTimeFilter}
+              />
 
-        <div className="bg-white rounded-xl p-4 shadow">
-          <h3 className="font-semibold mb-4 text-gray-800">Category Breakdown</h3>
-          {categoryData.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={250}>
-                <RePieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-bold">Recent Activity</h2>
+                  <button
+                    onClick={() => setActiveTab('history')}
+                    className="text-primary text-sm font-semibold hover:underline"
                   >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </RePieChart>
-              </ResponsiveContainer>
-              <div className="mt-4 space-y-2">
-                {categoryData.map((cat, index) => (
-                  <div key={cat.name} className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                      <span className="text-sm text-gray-700">{cat.name}</span>
-                    </div>
-                    <span className="font-semibold text-gray-900">${cat.value.toFixed(2)}</span>
-                  </div>
-                ))}
+                    See All
+                  </button>
+                </div>
+                <ExpenseList
+                  expenses={getFilteredExpenses()}
+                  limit={5}
+                  onEdit={handleEditClick}
+                />
               </div>
-            </>
-          ) : (
-            <p className="text-gray-400 text-center py-12">No data to display</p>
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold">History</h2>
+                <div className="flex gap-2 bg-muted rounded-lg p-1">
+                  {['week', 'month', 'all'].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setTimeFilter(f)}
+                      className={cn(
+                        "px-3 py-1 rounded-md text-xs font-semibold capitalize transition-all",
+                        timeFilter === f ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"
+                      )}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ExpenseList
+                expenses={getFilteredExpenses()}
+                onDelete={handleDeleteExpense}
+                onEdit={handleEditClick}
+              />
+            </div>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold">Analytics</h2>
+                <div className="flex gap-2 bg-muted rounded-lg p-1">
+                  {['week', 'month', 'all'].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setTimeFilter(f)}
+                      className={cn(
+                        "px-3 py-1 rounded-md text-xs font-semibold capitalize transition-all",
+                        timeFilter === f ? "bg-background shadow-sm text-foreground" : "text-muted-foreground"
+                      )}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Analytics trendData={getTrendData()} categoryData={getCategoryData()} />
+            </div>
           )}
         </div>
       </div>
-    );
-  };
 
-  return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="bg-white shadow-sm px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-800">Expense Tracker</h1>
-      </div>
+      <BottomNav
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onAddClick={() => {
+          setEditingExpense(null);
+          setShowAddModal(true);
+        }}
+      />
 
-      {activeTab === 'home' && <HomeScreen />}
-      {activeTab === 'history' && <HistoryScreen />}
-      {activeTab === 'analytics' && <AnalyticsScreen />}
-      
-      {showAddForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
-          <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 space-y-4 animate-slide-up">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">Add Expense</h2>
-              <button onClick={() => setShowAddForm(false)} className="text-gray-500 text-2xl">&times;</button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Date *</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Price *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Category *</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                >
-                  <option value="">Select category</option>
-                  {CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Payment Method *</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                >
-                  <option value="">Select payment method</option>
-                  {PAYMENT_METHODS.map(method => (
-                    <option key={method} value={method}>{method}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Description</label>
-                <input
-                  type="text"
-                  placeholder="Optional"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                />
-              </div>
-              <button
-                onClick={handleSubmit}
-                className="w-full bg-blue-500 text-white py-4 rounded-xl font-semibold hover:bg-blue-600 transition shadow-lg"
-              >
-                Save Expense
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-3">
-        <button
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition ${
-            activeTab === 'home' ? 'text-blue-500' : 'text-gray-500'
-          }`}
-        >
-          <PlusCircle size={24} />
-          <span className="text-xs font-medium">Home</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition ${
-            activeTab === 'history' ? 'text-blue-500' : 'text-gray-500'
-          }`}
-        >
-          <List size={24} />
-          <span className="text-xs font-medium">History</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition ${
-            activeTab === 'analytics' ? 'text-blue-500' : 'text-gray-500'
-          }`}
-        >
-          <TrendingUp size={24} />
-          <span className="text-xs font-medium">Analytics</span>
-        </button>
-      </nav>
+      <AddExpenseModal
+        isOpen={showAddModal}
+        onClose={() => {
+          setShowAddModal(false);
+          setEditingExpense(null);
+        }}
+        onSave={handleSaveExpense}
+        initialData={editingExpense}
+      />
     </div>
   );
 }
-
-export default App;
