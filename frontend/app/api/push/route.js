@@ -14,6 +14,14 @@ webpush.setVapidDetails(
 
 export async function POST(request) {
     try {
+        const authHeader = request.headers.get('Authorization');
+        if (authHeader !== `Bearer ${process.env.PUSH_API_SECRET}`) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
         const { title, body, url } = await request.json();
 
         // 1. Fetch all subscriptions from Supabase

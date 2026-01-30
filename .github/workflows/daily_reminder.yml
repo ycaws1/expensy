@@ -1,0 +1,23 @@
+name: Daily Push Reminder
+
+on:
+  schedule:
+    # Runs at 22:00 UTC (10 PM) every day
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+    # Allows manual triggering from the Actions tab
+
+jobs:
+  hit-push-endpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Push Notification
+        run: |
+          curl -X POST "${{ secrets.APP_URL }}/api/push" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.PUSH_API_SECRET }}" \
+            -d '{
+              "title": "Expensy Reminder",
+              "body": "Don'"'"'t forget to log your expenses for today!",
+              "url": "/"
+            }'

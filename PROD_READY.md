@@ -46,7 +46,12 @@ Expensy now supports persistent Web Push notifications that work even if the app
 ### Triggering the 10 PM Reminder
 Since the app stays closed, we now use a broadcast mechanism:
 - **Local Test**: Run `./trigger_reminder.sh` to send a notification to all subscribed devices.
-- **Production**: You can set up a "Cron Job" (using GitHub Actions or a service like EasyCron) to hit `https://your-app.vercel.app/api/push` every night at 10 PM UTC.
+- **Production**: Set up a GitHub Action to hit your production endpoint every night.
+    1. Go to your GitHub Repository -> Settings -> Secrets and variables -> Actions.
+    2. Add `APP_URL`: Your deployed app URL (e.g., `https://expensy.vercel.app`).
+    3. Add `PUSH_API_SECRET`: A long random string of your choice.
+    4. Ensure this same `PUSH_API_SECRET` is added to your Vercel/deployment environment variables.
+    5. The workflow is already created at `.github/workflows/daily_reminder.yml`.
 
 ## Next Steps
 1. **Apply SQL**: Paste the content of `migrate_schema.sql` into your Supabase SQL Editor.
