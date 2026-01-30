@@ -5,7 +5,10 @@ import SummaryCard from './components/SummaryCard';
 import ExpenseList from './components/ExpenseList';
 import AddExpenseModal from './components/AddExpenseModal';
 import Analytics from './components/Analytics';
-import { cn } from './lib/utils'; // Keep this for utility usage if needed in page.js 
+import { cn } from './lib/utils';
+import NotificationBanner from './components/NotificationBanner';
+import { useRouter } from 'next/navigation';
+import { LogOut, Bell } from 'lucide-react';
 
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 
@@ -21,6 +24,8 @@ export default function App() {
   const [timeFilter, setTimeFilter] = useState('month');
   const [editingExpense, setEditingExpense] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
+  const router = useRouter();
 
   const fetchExpenses = async () => {
     setLoading(true);
@@ -61,8 +66,42 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchExpenses();
-  }, []);
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (!session && isSupabaseConfigured) {
+        router.push('/login');
+      } else {
+        fetchExpenses();
+      }
+    };
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session && isSupabaseConfigured) {
+        router.push('/login');
+      }
+    });
+
+    // 10 PM Notification Logic
+    const checkNotification = setInterval(() => {
+      const now = new Date();
+      if (now.getHours() === 22 && now.getMinutes() === 0) {
+        if (Notification.permission === 'granted') {
+          new Notification('Expensy Reminder', {
+            body: 'Don\'t forget to log your expenses for today!',
+            icon: '/android-chrome-192x192.png'
+          });
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(checkNotification);
+    };
+  }, [router]);
 
   useEffect(() => {
     localStorage.setItem('expenses', JSON.stringify(expenses));
@@ -180,6 +219,29 @@ export default function App() {
       .sort((a, b) => new Date(a.date) - new Date(b.date));
   };
 
+  const getTrendPercentage = () => {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    const last30DaysSpend = expenses
+      .filter(e => {
+        const d = new Date(e.date);
+        return d >= thirtyDaysAgo && d <= now;
+      })
+      .reduce((sum, e) => sum + e.price, 0);
+
+    const previous30DaysSpend = expenses
+      .filter(e => {
+        const d = new Date(e.date);
+        return d >= sixtyDaysAgo && d < thirtyDaysAgo;
+      })
+      .reduce((sum, e) => sum + e.price, 0);
+
+    if (previous30DaysSpend === 0) return last30DaysSpend > 0 ? 100 : 0;
+    return ((last30DaysSpend - previous30DaysSpend) / previous30DaysSpend) * 100;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -200,7 +262,9 @@ export default function App() {
             <h1 className="text-2xl font-bold tracking-tight">Expensy</h1>
             <p className="text-sm text-muted-foreground">Track your wealth</p>
           </div>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-500 shadow-lg border-2 border-white" />
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-500 shadow-lg border-2 border-white flex items-center justify-center cursor-pointer group relative" onClick={() => supabase.auth.signOut()}>
+            <LogOut size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
         </div>
 
         <div className="px-6 flex-1 space-y-6">
@@ -210,6 +274,7 @@ export default function App() {
                 totalSpent={getTotalSpent()}
                 timeFilter={timeFilter}
                 setTimeFilter={setTimeFilter}
+                trendPercentage={getTrendPercentage()}
               />
 
               <div>
@@ -281,26 +346,46 @@ export default function App() {
             </div>
           )}
         </div>
+        <NotificationBanner />
+
+        {/* Notification Test Trigger */}
+        <button
+          onClick={() => {
+            if (Notification.permission === 'granted') {
+              new Notification('Expensy Test', {
+                body: 'Notification system is active!',
+                icon: '/android-chrome-192x192.png'
+              });
+            } else {
+              alert('Please allow notification permission first.');
+            }
+          }}
+          className="fixed bottom-6 left-6 w-10 h-10 bg-card border border-border rounded-full flex items-center justify-center shadow-lg text-muted-foreground hover:text-primary transition-all active:scale-95 z-[60]"
+          title="Test Notification"
+        >
+          <Bell size={18} />
+        </button>
+
+        <BottomNav
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onAddClick={() => {
+            setEditingExpense(null);
+            setShowAddModal(true);
+          }}
+        />
+
+        <AddExpenseModal
+          key={showAddModal ? (editingExpense?.id || 'new') : 'closed'}
+          isOpen={showAddModal}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingExpense(null);
+          }}
+          onSave={handleSaveExpense}
+          initialData={editingExpense}
+        />
       </div>
-
-      <BottomNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onAddClick={() => {
-          setEditingExpense(null);
-          setShowAddModal(true);
-        }}
-      />
-
-      <AddExpenseModal
-        isOpen={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          setEditingExpense(null);
-        }}
-        onSave={handleSaveExpense}
-        initialData={editingExpense}
-      />
     </div>
   );
 }

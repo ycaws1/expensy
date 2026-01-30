@@ -71,7 +71,7 @@ export default function ExpenseList({ expenses, onDelete, onEdit, limit }) {
                                         e.stopPropagation();
                                         onDelete(expense.id);
                                     }}
-                                    className="p-2 text-muted-foreground hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 z-10"
+                                    className="p-2 text-muted-foreground hover:text-red-500 transition-colors z-10"
                                 >
                                     <Trash2 size={16} />
                                 </button>

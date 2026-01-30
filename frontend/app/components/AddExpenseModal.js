@@ -6,32 +6,12 @@ const CATEGORIES = ['Food', 'Transport', 'Rent', 'Mortgage', 'Income Tax', 'Ente
 const PAYMENT_METHODS = ['Cash', 'Credit Card', 'Debit Card', 'Bank Transfer', 'Digital Wallet'];
 
 export default function AddExpenseModal({ isOpen, onClose, onSave, initialData }) {
-    const [date, setDate] = useState('');
-    const [price, setPrice] = useState('');
-    const [category, setCategory] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState('');
-    const [description, setDescription] = useState('');
+    const [date, setDate] = useState(() => initialData?.date || new Date().toISOString().split('T')[0]);
+    const [price, setPrice] = useState(() => initialData?.price?.toString() || '');
+    const [category, setCategory] = useState(() => initialData?.category || '');
+    const [paymentMethod, setPaymentMethod] = useState(() => initialData?.paymentMethod || '');
+    const [description, setDescription] = useState(() => initialData?.description || '');
     const [isClosing, setIsClosing] = useState(false);
-
-    useEffect(() => {
-        if (isOpen) {
-            if (initialData) {
-                setDate(initialData.date);
-                setPrice(initialData.price.toString());
-                setCategory(initialData.category);
-                setPaymentMethod(initialData.paymentMethod);
-                setDescription(initialData.description || '');
-            } else {
-                const now = new Date();
-                setDate(now.toISOString().split('T')[0]);
-                setPrice('');
-                setCategory('');
-                setPaymentMethod('');
-                setDescription('');
-            }
-            setIsClosing(false);
-        }
-    }, [isOpen, initialData]);
 
     const handleClose = () => {
         setIsClosing(true);
