@@ -262,8 +262,26 @@ export default function App() {
             <h1 className="text-2xl font-bold tracking-tight">Expensy</h1>
             <p className="text-sm text-muted-foreground">Track your wealth</p>
           </div>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-500 shadow-lg border-2 border-white flex items-center justify-center cursor-pointer group relative" onClick={() => supabase.auth.signOut()}>
-            <LogOut size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (Notification.permission === 'granted') {
+                  new Notification('Expensy Test', {
+                    body: 'Notification system is active!',
+                    icon: '/android-chrome-192x192.png'
+                  });
+                } else {
+                  alert('Please allow notification permission first.');
+                }
+              }}
+              className="w-10 h-10 rounded-full bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-primary transition-all active:scale-95"
+              title="Test Notification"
+            >
+              <Bell size={18} />
+            </button>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-purple-500 shadow-lg border-2 border-white flex items-center justify-center cursor-pointer group relative" onClick={() => supabase.auth.signOut()}>
+              <LogOut size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
           </div>
         </div>
 
@@ -347,24 +365,6 @@ export default function App() {
           )}
         </div>
         <NotificationBanner />
-
-        {/* Notification Test Trigger */}
-        <button
-          onClick={() => {
-            if (Notification.permission === 'granted') {
-              new Notification('Expensy Test', {
-                body: 'Notification system is active!',
-                icon: '/android-chrome-192x192.png'
-              });
-            } else {
-              alert('Please allow notification permission first.');
-            }
-          }}
-          className="fixed bottom-6 left-6 w-10 h-10 bg-card border border-border rounded-full flex items-center justify-center shadow-lg text-muted-foreground hover:text-primary transition-all active:scale-95 z-[60]"
-          title="Test Notification"
-        >
-          <Bell size={18} />
-        </button>
 
         <BottomNav
           activeTab={activeTab}
