@@ -56,8 +56,11 @@ export default function ExpenseList({ expenses, onDelete, onEdit, limit }) {
                                 <Icon size={20} />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-foreground">{expense.category}</h3>
-                                <p className="text-xs text-muted-foreground">{formatDate(expense.date)} • {expense.paymentMethod}</p>
+                                <h3 className="font-semibold text-foreground leading-tight">{expense.category}</h3>
+                                {expense.description && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{expense.description}</p>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-0.5">{formatDate(expense.date)} • {expense.paymentMethod}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, DollarSign, Tag, CreditCard, AlignLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const CATEGORIES = ['Food', 'Transport', 'Rent', 'Entertainment', 'Shopping', 'Utilities', 'Healthcare', 'Other'];
+const CATEGORIES = ['Food', 'Transport', 'Rent', 'Mortgage', 'Income Tax', 'Entertainment', 'Shopping', 'Utilities', 'Healthcare', 'Credit Card Bill', 'Other'];
 const PAYMENT_METHODS = ['Cash', 'Credit Card', 'Debit Card', 'Bank Transfer', 'Digital Wallet'];
 
 export default function AddExpenseModal({ isOpen, onClose, onSave, initialData }) {
