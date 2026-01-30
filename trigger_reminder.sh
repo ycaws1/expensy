@@ -6,7 +6,7 @@
 
 curl -X POST http://localhost:3000/api/push \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${PUSH_API_SECRET}" \
+  -H "Authorization: Bearer pushsecret123" \
   -d '{
     "title": "Expensy Reminder",
     "body": "Don'"'"'t forget to log your expenses for today!",

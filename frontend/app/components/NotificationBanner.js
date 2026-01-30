@@ -45,21 +45,39 @@ export default function NotificationBanner() {
             let subscription = await registration.pushManager.getSubscription();
 
             if (!subscription) {
+                console.log('No existing subscription found, creating new one...');
                 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
                 if (!publicKey) {
-                    console.error('VAPID Public Key missing');
+                    console.error('VAPID Public Key missing from environment');
                     return;
                 }
 
-                subscription = await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(publicKey)
-                });
+                console.log('Using Public Key:', publicKey);
+                try {
+                    const applicationServerKey = urlBase64ToUint8Array(publicKey);
+                    subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey
+                    });
+                    console.log('Successfully subscribed:', subscription);
+                } catch (subError) {
+                    console.error('Registration.pushManager.subscribe failed:', subError);
+                    throw subError;
+                }
+            } else {
+                console.log('Existing subscription found');
             }
 
             // Save to Supabase
-            const { data: { user } } = await supabase.auth.getUser();
+            console.log('Getting user from Supabase auth...');
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError) {
+                console.error('Auth User Error:', authError);
+                throw authError;
+            }
+
             if (user) {
+                console.log('Saving subscription for user:', user.id);
                 const { error } = await supabase.from('push_subscriptions').upsert({
                     user_id: user.id,
                     subscription: subscription.toJSON()
@@ -67,11 +85,24 @@ export default function NotificationBanner() {
                     onConflict: 'user_id,subscription'
                 });
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase Upsert Error Detail:', error.message, error.details, error.hint);
+                    throw error;
+                }
+                console.log('Subscription saved successfully');
+            } else {
+                console.warn('No user logged in, subscription not saved to DB');
             }
 
         } catch (error) {
-            console.error('Push Subscription Error:', error);
+            console.error('Push Subscription Error (Full):', error);
+            console.error('Error String:', String(error));
+            console.error('Error Stack:', error.stack);
+            if (error.message) console.error('Error Message:', error.message);
+            // Some objects (like DOMException) don't stringify well in console.error
+            try {
+                console.error('Error JSON:', JSON.stringify(error));
+            } catch (e) { }
         }
     };
 
