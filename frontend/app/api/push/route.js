@@ -12,6 +12,38 @@ webpush.setVapidDetails(
     process.env.VAPID_PRIVATE_KEY
 );
 
+export async function GET(request) {
+    try {
+        const authHeader = request.headers.get('Authorization');
+        if (authHeader !== `Bearer ${process.env.PUSH_API_SECRET}`) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        const { data: subscriptions, error, count } = await supabase
+            .from('push_subscriptions')
+            .select('*', { count: 'exact' });
+
+        if (error) throw error;
+
+        return new Response(JSON.stringify({
+            status: 'Push API is online',
+            count: count,
+            subscriptions: subscriptions
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+}
+
 export async function POST(request) {
     try {
         const authHeader = request.headers.get('Authorization');
@@ -58,6 +90,35 @@ export async function POST(request) {
         });
     } catch (error) {
         console.error('Push Error:', error);
+        return new Response(JSON.stringify({ error: error.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+}
+
+export async function DELETE(request) {
+    try {
+        const authHeader = request.headers.get('Authorization');
+        if (authHeader !== `Bearer ${process.env.PUSH_API_SECRET}`) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        const { error } = await supabase
+            .from('push_subscriptions')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Deletes all rows
+
+        if (error) throw error;
+
+        return new Response(JSON.stringify({ success: true, message: 'All subscriptions cleared' }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
+    } catch (error) {
         return new Response(JSON.stringify({ error: error.message }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' },

@@ -2,8 +2,8 @@ name: Daily Push Reminder
 
 on:
   schedule:
-    # Runs at 22:00 UTC (10 PM) every day
-    - cron: '0 22 * * *'
+    # Runs at 14:00 UTC (10 PM GMT+8) every day
+    - cron: '0 14 * * *'
   workflow_dispatch:
     # Allows manual triggering from the Actions tab
 
