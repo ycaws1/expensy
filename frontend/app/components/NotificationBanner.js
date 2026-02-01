@@ -4,20 +4,7 @@ import { Bell, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-        .replace(/\-/g, '+')
-        .replace(/_/g, '/');
-
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-}
+import { subscribeToPush } from '../lib/push';
 
 export default function NotificationBanner() {
     const [permission, setPermission] = useState(() =>
@@ -37,72 +24,15 @@ export default function NotificationBanner() {
         }
     }, []);
 
-    const subscribeToPush = async () => {
+    const handleSubscribe = async () => {
         try {
-            const registration = await navigator.serviceWorker.ready;
-
-            // Check for existing subscription
-            let subscription = await registration.pushManager.getSubscription();
-
-            if (!subscription) {
-                console.log('No existing subscription found, creating new one...');
-                const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-                if (!publicKey) {
-                    console.error('VAPID Public Key missing from environment');
-                    return;
-                }
-
-                console.log('Using Public Key:', publicKey);
-                try {
-                    const applicationServerKey = urlBase64ToUint8Array(publicKey);
-                    subscription = await registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey
-                    });
-                    console.log('Successfully subscribed:', subscription);
-                } catch (subError) {
-                    console.error('Registration.pushManager.subscribe failed:', subError);
-                    throw subError;
-                }
-            } else {
-                console.log('Existing subscription found');
+            const success = await subscribeToPush();
+            if (success) {
+                console.log('Subscription successful');
+                setShow(false);
             }
-
-            // Save to Supabase
-            console.log('Getting user from Supabase auth...');
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (authError) {
-                console.error('Auth User Error:', authError);
-                throw authError;
-            }
-
-            if (user) {
-                console.log('Saving subscription for user:', user.id);
-                const { error } = await supabase.from('push_subscriptions').upsert({
-                    user_id: user.id,
-                    subscription: subscription.toJSON()
-                }, {
-                    onConflict: 'user_id,subscription'
-                });
-
-                if (error) {
-                    console.error('Supabase Upsert Error Detail:', error.message, error.details, error.hint);
-                    throw error;
-                }
-                console.log('Subscription saved successfully');
-            } else {
-                console.warn('No user logged in, subscription not saved to DB');
-            }
-
         } catch (error) {
-            console.error('Push Subscription Error (Full):', error);
-            console.error('Error String:', String(error));
-            console.error('Error Stack:', error.stack);
-            if (error.message) console.error('Error Message:', error.message);
-            // Some objects (like DOMException) don't stringify well in console.error
-            try {
-                console.error('Error JSON:', JSON.stringify(error));
-            } catch (e) { }
+            console.error('Push Subscription Error:', error);
         }
     };
 
@@ -112,8 +42,7 @@ export default function NotificationBanner() {
         const result = await Notification.requestPermission();
         setPermission(result);
         if (result === 'granted') {
-            setShow(false);
-            await subscribeToPush();
+            await handleSubscribe();
         }
     };
 

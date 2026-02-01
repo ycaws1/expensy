@@ -8,7 +8,8 @@ import Analytics from './components/Analytics';
 import { cn } from './lib/utils';
 import NotificationBanner from './components/NotificationBanner';
 import { useRouter } from 'next/navigation';
-import { LogOut, Bell } from 'lucide-react';
+import { LogOut, Bell, RefreshCw } from 'lucide-react';
+import { subscribeToPush, unsubscribeFromPush } from './lib/push';
 
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 
@@ -264,18 +265,33 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (Notification.permission === 'granted') {
-                  new Notification('Expensy Test', {
-                    body: 'Notification system is active!',
-                    icon: '/android-chrome-192x192.png'
-                  });
+                  const btn = document.activeElement;
+                  const originalHtml = btn.innerHTML;
+                  btn.innerHTML = '<span class="animate-spin">⏳</span>';
+                  btn.disabled = true;
+
+                  try {
+                    await unsubscribeFromPush();
+                    await subscribeToPush();
+
+                    new Notification('Subscription Refreshed', {
+                      body: 'Your push notification subscription has been reset.',
+                      icon: '/android-chrome-192x192.png'
+                    });
+                  } catch (err) {
+                    alert('Failed to refresh subscription: ' + err.message);
+                  } finally {
+                    btn.innerHTML = originalHtml;
+                    btn.disabled = false;
+                  }
                 } else {
                   alert('Please allow notification permission first.');
                 }
               }}
               className="w-10 h-10 rounded-full bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-primary transition-all active:scale-95"
-              title="Test Notification"
+              title="Refresh Subscription"
             >
               <Bell size={18} />
             </button>

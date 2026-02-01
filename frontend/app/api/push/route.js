@@ -110,7 +110,7 @@ export async function DELETE(request) {
         const { error } = await supabase
             .from('push_subscriptions')
             .delete()
-            .neq('id', '00000000-0000-0000-0000-000000000000'); // Deletes all rows
+            .neq('id', -1); // Deletes all rows (id is bigint)
 
         if (error) throw error;
 
