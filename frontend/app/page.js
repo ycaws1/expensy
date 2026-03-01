@@ -34,9 +34,14 @@ export default function App() {
 
     if (isSupabaseConfigured) {
       try {
+        const fiveYearsAgo = new Date();
+        fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+        const fiveYearsAgoDateString = fiveYearsAgo.toISOString().split('T')[0];
+
         const { data, error } = await supabase
           .from('expenses')
           .select('*')
+          .gte('date', fiveYearsAgoDateString)
           .order('date', { ascending: false });
 
         if (error) throw error;
@@ -204,20 +209,28 @@ export default function App() {
   };
 
   const getTrendData = () => {
-    const filtered = getFilteredExpenses();
-    const dailyTotals = {};
+    const isMonthly = timeFilter === 'month';
+    const sourceExpenses = isMonthly ? expenses : getFilteredExpenses();
 
-    filtered.forEach(expense => {
-      const date = expense.date;
-      dailyTotals[date] = (dailyTotals[date] || 0) + expense.price;
+    const totals = {};
+
+    sourceExpenses.forEach(expense => {
+      let key = expense.date;
+      if (isMonthly) {
+        const dateObj = new Date(expense.date);
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        key = `${year}-${month}`;
+      }
+      totals[key] = (totals[key] || 0) + expense.price;
     });
 
-    return Object.entries(dailyTotals)
+    return Object.entries(totals)
       .map(([date, total]) => ({
         date,
         amount: parseFloat(total.toFixed(2))
       }))
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
+      .sort((a, b) => a.date.localeCompare(b.date));
   };
 
   const getTrendPercentage = () => {
@@ -376,7 +389,7 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <Analytics trendData={getTrendData()} categoryData={getCategoryData()} />
+              <Analytics trendData={getTrendData()} categoryData={getCategoryData()} timeFilter={timeFilter} />
             </div>
           )}
         </div>

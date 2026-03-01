@@ -106,6 +106,13 @@ export default function LoginPage() {
                                 minLength={6}
                             />
                         </div>
+                        {!isSignUp && (
+                            <div className="flex justify-end">
+                                <a href="/forgot-password" className="text-sm font-medium text-primary hover:underline transition-all">
+                                    Forgot Password?
+                                </a>
+                            </div>
+                        )}
                         <button
                             type="submit"
                             disabled={loading}

@@ -5,7 +5,7 @@ import { ArrowUpRight } from 'lucide-react';
 
 const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#f97316', '#64748b'];
 
-export default function Analytics({ trendData, categoryData }) {
+export default function Analytics({ trendData, categoryData, timeFilter }) {
     return (
         <div className="space-y-6 pb-24">
             <div className="p-4">
@@ -27,7 +27,16 @@ export default function Analytics({ trendData, categoryData }) {
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fontSize: 12, fill: 'var(--muted-foreground)' }}
-                                tickFormatter={(value) => value.split('-').slice(1).join('/')}
+                                tickFormatter={(value) => {
+                                    if (timeFilter === 'month' && value && value.includes('-')) {
+                                        const parts = value.split('-');
+                                        if (parts.length >= 2) {
+                                            const date = new Date(parts[0], parseInt(parts[1]) - 1, 1);
+                                            return date.toLocaleString('default', { month: 'short' });
+                                        }
+                                    }
+                                    return value && value.includes('-') ? value.split('-').slice(1).join('/') : value;
+                                }}
                             />
                             <YAxis
                                 axisLine={false}
