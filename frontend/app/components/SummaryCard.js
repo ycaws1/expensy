@@ -4,6 +4,7 @@ import { ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
 
 export default function SummaryCard({ totalSpent, timeFilter, setTimeFilter, trendPercentage }) {
     const filters = [
+        { id: 'day', label: 'Day' },
         { id: 'week', label: 'Week' },
         { id: 'month', label: 'Month' },
         { id: 'all', label: 'All' },

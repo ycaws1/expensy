@@ -180,7 +180,10 @@ export default function App() {
     const now = new Date();
     return expenses.filter(expense => {
       const expenseDate = new Date(expense.date);
-      if (timeFilter === 'week') {
+      if (timeFilter === 'day') {
+        const today = now.toISOString().split('T')[0];
+        return expense.date === today;
+      } else if (timeFilter === 'week') {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         return expenseDate >= weekAgo;
       } else if (timeFilter === 'month') {
@@ -359,7 +362,7 @@ export default function App() {
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold">History</h2>
                 <div className="flex gap-2 bg-muted rounded-lg p-1">
-                  {['week', 'month', 'all'].map(f => (
+                  {['day', 'week', 'month', 'all'].map(f => (
                     <button
                       key={f}
                       onClick={() => setTimeFilter(f)}
@@ -386,7 +389,7 @@ export default function App() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold">Analytics</h2>
                 <div className="flex gap-2 bg-muted rounded-lg p-1">
-                  {['week', 'month', 'all'].map(f => (
+                  {['day', 'week', 'month', 'all'].map(f => (
                     <button
                       key={f}
                       onClick={() => setTimeFilter(f)}

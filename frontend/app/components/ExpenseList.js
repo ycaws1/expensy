@@ -69,7 +69,9 @@ export default function ExpenseList({ expenses, onDelete, onEdit, limit }) {
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onDelete(expense.id);
+                                        if (window.confirm('Are you sure you want to delete this expense?')) {
+                                            onDelete(expense.id);
+                                        }
                                     }}
                                     className="p-2 text-muted-foreground hover:text-red-500 transition-colors z-10"
                                 >
