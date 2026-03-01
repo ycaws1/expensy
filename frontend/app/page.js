@@ -210,7 +210,8 @@ export default function App() {
 
   const getTrendData = () => {
     const isMonthly = timeFilter === 'month';
-    const sourceExpenses = isMonthly ? expenses : getFilteredExpenses();
+    const isWeekly = timeFilter === 'week';
+    const sourceExpenses = expenses;
 
     const totals = {};
 
@@ -221,6 +222,16 @@ export default function App() {
         const year = dateObj.getFullYear();
         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
         key = `${year}-${month}`;
+      } else if (isWeekly) {
+        const parts = expense.date.split('-');
+        const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+        const day = dateObj.getDay();
+        const diff = dateObj.getDate() - day + (day === 0 ? -6 : 1);
+        const weekStart = new Date(dateObj.setDate(diff));
+        const year = weekStart.getFullYear();
+        const month = String(weekStart.getMonth() + 1).padStart(2, '0');
+        const date = String(weekStart.getDate()).padStart(2, '0');
+        key = `${year}-${month}-${date}`;
       }
       totals[key] = (totals[key] || 0) + expense.price;
     });
